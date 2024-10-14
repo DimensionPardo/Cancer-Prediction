@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachable Machine Image Classifier</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+        }
+
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        /* Custom button style */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .upload-btn-wrapper input[type="file"] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+        }
+
+        #label-container {
+            margin-top: 20px;
+        }
+
+        #label-container div {
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 16px;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Image Classifier</h1>
+        <div class="upload-btn-wrapper">
+            <button class="btn">Upload Image</button>
+            <input type="file" id="image-upload" accept="image/*" disabled />
+        </div>
+        <div id="label-container"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        const URL = "mymodel/";
+
+        let model, maxPredictions;
+
+        // Automatically load the model when the page loads
+        window.onload = async function() {
+            await init();
+        }
+
+        // Initialize the model
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Load the model and metadata
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Setup label container for predictions
+            const labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = '';  // Clear previous labels
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+
+            // Enable file input once the model is ready
+            document.getElementById('image-upload').disabled = false;
+
+            // Setup the file input listener
+            const imageUpload = document.getElementById('image-upload');
+            imageUpload.addEventListener('change', predictImage);
+        }
+
+        // Predict the category of the uploaded image
+        async function predictImage(event) {
+            const file = event.target.files[0];
+            if (file && model) {
+                const reader = new FileReader();
+                reader.readAsDataURL(file); // Read the file as a data URL
+
+                reader.onloadend = async () => {
+                    const image = document.createElement('img');
+                    image.src = reader.result; // Use the loaded data URL as the image source
+                    image.onload = async () => {
+                        const prediction = await model.predict(image);
+                        const labelContainer = document.getElementById("label-container");
+                        for (let i = 0; i < maxPredictions; i++) {
+                            const classPrediction =
+                                prediction[i].className + ": " + prediction[i].probability.toFixed(2);
+                            labelContainer.childNodes[i].innerHTML = classPrediction;
+                        }
+                    };
+                };
+            } else {
+                console.error('Model not loaded or no file uploaded');
+            }
+        }
+    </script>
+
+</body>
+</html>
