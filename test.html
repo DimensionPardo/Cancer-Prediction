@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teachable Machine Image Classifier (Multiple Models)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+        }
+
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            width: 100%;
+        }
+
+        /* Custom button style */
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #007bff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn:hover {
+            background-color: #0056b3;
+        }
+
+        .upload-btn-wrapper input[type="file"] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+        }
+
+        #label-container {
+            margin-top: 20px;
+        }
+
+        #label-container div {
+            background-color: #f0f0f0;
+            border-radius: 5px;
+            padding: 10px;
+            margin: 5px 0;
+            font-size: 16px;
+            color: #333;
+        }
+
+        .model-predictions {
+            margin-top: 20px;
+        }
+
+        .accuracy {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>Image Classifier</h1>
+        <div class="upload-btn-wrapper">
+            <button class="btn">Upload Folder of Images</button>
+            <input type="file" id="image-upload" accept="image/*" webkitdirectory multiple />
+        </div>
+        <div id="label-container">
+            <div class="model-predictions" id="model1-predictions"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+
+    <script type="text/javascript">
+        const MODEL_URLS = [
+            "TensorflowJS Models/trainedboth/"
+            
+        ];
+
+        let models = [];
+        let maxPredictions = [];
+        const actualLabels = ["Benigno", "Maligno"]; // Update this according to your categories
+
+        // Automatically load all models when the page loads
+        window.onload = async function() {
+            await init();
+        }
+
+        // Initialize the models
+        async function init() {
+            for (let i = 0; i < MODEL_URLS.length; i++) {
+                const modelURL = MODEL_URLS[i] + "model.json";
+                const metadataURL = MODEL_URLS[i] + "metadata.json";
+
+                // Load each model and metadata
+                try {
+                    const model = await tmImage.load(modelURL, metadataURL);
+                    models.push(model);
+                    const maxPrediction = model.getTotalClasses();
+                    maxPredictions.push(maxPrediction);
+
+                    // Setup label container for each model's predictions
+                    const labelContainer = document.getElementById(`model${i + 1}-predictions`);
+                    labelContainer.innerHTML = `<h3>Model ${MODEL_URLS[i]} Predictions</h3>`;
+
+                    labelContainer.appendChild(document.createElement("div"));
+                    
+                } catch (error) {
+                    console.error(`Error loading model ${i + 1}:`, error);
+                }
+            }
+
+            // Enable file input once the models are ready
+            document.getElementById('image-upload').disabled = false;
+
+            // Setup the file input listener
+            const imageUpload = document.getElementById('image-upload');
+            imageUpload.addEventListener('change', predictImages);
+        }
+
+        // Predict the category of the uploaded images using all models
+        async function predictImages(event) {
+            const files = event.target.files;
+            const totalFiles = files.length;
+
+            if (totalFiles === 0 || models.length !== MODEL_URLS.length) {
+                console.error('Models not loaded or no files uploaded');
+                return;
+            }
+
+            // Initialize accuracy counters for each model
+            let correctPredictions = new Array(models.length).fill(0);
+
+            for (let i = 0; i < totalFiles; i++) {
+                const file = files[i];
+                const reader = new FileReader();
+                reader.readAsDataURL(file); // Read the file as a data URL
+                
+                reader.onloadend = async () => {
+                    const image = document.createElement('img');
+                    image.src = reader.result; // Use the loaded data URL as the image source
+
+                    image.onload = async () => {
+                        for (let j = 0; j < models.length; j++) {
+                            const prediction = await models[j].predict(image);
+                            if (prediction[0].probability > prediction[1].probability) {
+                                predictedLabel = 'Benigno'
+                            }
+                            else{
+                                predictedLabel = 'Maligno'
+                            }
+                            const expectedLabel = getExpectedLabel(file.name); // Get the expected label based on filename
+
+                            // Check if the predicted label matches the expected label
+                            if (predictedLabel === expectedLabel) {
+                                correctPredictions[j]++;
+                                
+                            }
+                        }
+                    };
+                };
+            }
+
+            // Calculate and display accuracy after all predictions
+            setTimeout(() => {
+                displayAccuracy(correctPredictions, totalFiles);
+            }, 30000); // Wait for all images to load before calculating accuracy
+        }
+
+        function getExpectedLabel(fileName) {
+            // Assuming file names contain the category. Update the logic as needed.
+            if (fileName.includes("benigno")) {
+                
+                return actualLabels[0]; // First folder type
+            } else if (fileName.includes("maligno")) {
+                return actualLabels[1];
+                 // Second folder type
+            }
+            return null; // In case of an unknown label
+        }
+
+        function displayAccuracy(correctPredictions, totalFiles) {
+            correctPredictions.forEach((correct, index) => {
+                const accuracy = ((correct / totalFiles) * 100).toFixed(2);
+                const labelContainer = document.getElementById(`model${index + 1}-predictions`);
+                labelContainer.innerHTML += `<div class="accuracy">Accuracy: ${accuracy}% (${correct}/${totalFiles})</div>`;
+            });
+        }
+    </script>
+
+</body>
+</html>
